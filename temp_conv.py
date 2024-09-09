@@ -1,50 +1,58 @@
-from flask import Flask, render_template, request
+from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
-@app.route('/', methods=['GET', 'POST'])
-def converter():
-    result = ''
-    if request.method == 'POST':
-        try:
-            temperature = float(request.form.get('temperature', 0))
-            unit = request.form.get('unit')
-            
-            if unit == 'celsius':
-                result = (temperature * 9/5) + 32  # Convert Celsius to Fahrenheit
-                result = f'{result:.2f} Fahrenheit'
-            elif unit == 'fahrenheit':
-                result = (temperature - 32) * 5/9  # Convert Fahrenheit to Celsius
-                result = f'{result:.2f} Celsius'
-            else:
-                result = 'Error: Invalid unit'
-        except ValueError:
-            result = 'Error: Invalid input'
-
-    return render_template('index.html', result=result)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+# HTML for the Temperature Converter
+temperature_converter_html = '''
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Temperature Converter</title>
+    <script>
+        async function convertTemperature() {
+            const temp = document.getElementById('temp').value;
+            const scale = document.getElementById('scale').value;
+            const response = await fetch(`/convert_temperature?temp=${temp}&scale=${scale}`);
+            const data = await response.json();
+            document.getElementById('result').innerText = `Result: ${data.result || data.error}`;
+        }
+    </script>
 </head>
 <body>
     <h1>Temperature Converter</h1>
-    <form method="post">
-        <label for="temperature">Temperature:</label>
-        <input type="text" id="temperature" name="temperature" required><br><br>
-        
-        <label for="unit">Unit:</label>
-        <select id="unit" name="unit" required>
-            <option value="celsius">Celsius to Fahrenheit</option>
-            <option value="fahrenheit">Fahrenheit to Celsius</option>
-        </select><br><br>
-        
-        <input type="submit" value="Convert">
-    </form>
-    <h2>Result:</h2>
-    <p>{{ result }}</p>
+    <input type="number" id="temp" placeholder="Enter temperature" />
+    <select id="scale">
+        <option value="C">Celsius to Fahrenheit</option>
+        <option value="F">Fahrenheit to Celsius</option>
+    </select>
+    <button onclick="convertTemperature()">Convert</button>
+    <p id="result"></p>
 </body>
 </html>
+'''
+
+@app.route('/')
+def index():
+    return render_template_string(temperature_converter_html)
+
+@app.route('/convert_temperature', methods=['GET'])
+def convert_temperature():
+    try:
+        temp = float(request.args.get('temp'))
+        scale = request.args.get('scale')
+        
+        if scale == 'C':
+            converted = (temp * 9/5) + 32
+            return jsonify({'result': f'{converted} F'})
+        elif scale == 'F':
+            converted = (temp - 32) * 5/9
+            return jsonify({'result': f'{converted} C'})
+        else:
+            return jsonify({'error': 'Invalid scale. Use C or F.'})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+if __name__ == '__main__':
+    app.run(debug=True)
